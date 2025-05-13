@@ -1,5 +1,4 @@
-﻿Backend folder structure
-
+﻿
 C:\BriselleServer\edx-briselle\edx-briselle.Server\bin                                                                 
 C:\BriselleServer\edx-briselle\edx-briselle.Server\Controllers                                                         
 C:\BriselleServer\edx-briselle\edx-briselle.Server\obj                                                                 
