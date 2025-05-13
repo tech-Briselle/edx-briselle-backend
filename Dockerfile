@@ -24,7 +24,6 @@ FROM with-node AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["edx-briselle.Server/edx-briselle.Server.csproj", "edx-briselle.Server/"]
-COPY ["edx-briselle.client/edx-briselle.client.esproj", "edx-briselle.client/"]
 RUN dotnet restore "./edx-briselle.Server/edx-briselle.Server.csproj"
 COPY . .
 WORKDIR "/src/edx-briselle.Server"
