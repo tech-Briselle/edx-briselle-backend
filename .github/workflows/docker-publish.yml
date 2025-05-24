@@ -1,98 +1,49 @@
-name: Docker
+# Workflow name as it appears in GitHub Actions tab
+name: Docker Publish to Docker Hub
 
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
+# Trigger this workflow when code is pushed to "master" or when tags like v1.0.0 are pushed
 on:
-  schedule:
-    - cron: '22 2 * * *'
   push:
     branches: [ "master" ]
-    # Publish semver tags as releases.
-    tags: [ 'v*.*.*' ]
-  pull_request:
-    branches: [ "master" ]
+    tags: [ "v*.*.*" ] # Optional: Helps you push semver-based Docker tags
 
+# Set environment variables used throughout the workflow
 env:
-  # Use docker.io for Docker Hub if empty
-  REGISTRY: ghcr.io
-  # github.repository as <account>/<repo>
-  IMAGE_NAME: ${{ github.repository }}
-
+  REGISTRY: docker.io # Docker Hub registry
+  IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/edx-briselle-backend # Image path on Docker Hub
 
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      # This is used to complete the identity challenge
-      # with sigstore/fulcio when running outside of PRs.
-      id-token: write
+  build-and-push:
+    runs-on: ubuntu-latest # GitHub-hosted Linux runner
 
     steps:
-      - name: Checkout repository
+      # Step 1: Checkout your repository code
+      - name: Checkout source code
         uses: actions/checkout@v4
 
-      # Install the cosign tool except on PR
-      # https://github.com/sigstore/cosign-installer
-      - name: Install cosign
-        if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 #v3.5.0
-        with:
-          cosign-release: 'v2.2.4'
-
-      # Set up BuildKit Docker container builder to be able to build
-      # multi-platform images and export cache
-      # https://github.com/docker/setup-buildx-action
+      # Step 2: Set up Docker Buildx for advanced features like cache, multi-arch builds
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
+        uses: docker/setup-buildx-action@v3
 
-      # Login against a Docker registry except on PR
-      # https://github.com/docker/login-action
-      - name: Log into registry ${{ env.REGISTRY }}
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+      # Step 3: Log in to Docker Hub using secrets you configured
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKER_USERNAME }} # Docker Hub username stored as secret
+          password: ${{ secrets.DOCKER_PASSWORD }} # Docker Hub password or PAT stored as secret
 
-      # Extract metadata (tags, labels) for Docker
-      # https://github.com/docker/metadata-action
+      # Step 4: Extract Docker image metadata (tags, labels) automatically
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      # Build and push Docker image with Buildx (don't push on PR)
-      # https://github.com/docker/build-push-action
+      # Step 5: Build and push the Docker image to Docker Hub
       - name: Build and push Docker image
-        id: build-and-push
-        uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
+        uses: docker/build-push-action@v5
         with:
-          context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Sign the resulting Docker image digest except on PRs.
-      # This will only write to the public Rekor transparency log when the Docker
-      # repository is public to avoid leaking data.  If you would like to publish
-      # transparency data even for private images, pass --force to cosign below.
-      # https://github.com/sigstore/cosign
-      - name: Sign the published Docker image
-        if: ${{ github.event_name != 'pull_request' }}
-        env:
-          # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
-          TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-        # This step uses the identity token to provision an ephemeral certificate
-        # against the sigstore community Fulcio instance.
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+          context: . # Current directory as Docker build context
+          push: true # Actually push the image to Docker Hub
+          tags: ${{ steps.meta.outputs.tags }} # Automatically generate image tags
+          labels: ${{ steps.meta.outputs.labels }} # Automatically add metadata labels
